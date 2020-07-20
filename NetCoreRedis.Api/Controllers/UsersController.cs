@@ -27,13 +27,21 @@ namespace NetCoreRedis.Api.Controllers
             
             if (cacheValue == null)
             {
+                // Set a time to expires the cache data
+                DistributedCacheEntryOptions options = new DistributedCacheEntryOptions();
+                options.SetAbsoluteExpiration(TimeSpan.FromMinutes(2));
+
                 cacheValue = JsonSerializer.Serialize(GenerateUsers());
-                await cache.SetStringAsync("Users", cacheValue);
+                await cache.SetStringAsync("Users", cacheValue, options);
             }
 
             return Ok(cacheValue);
         }
 
+        /// <summary>
+        /// Generates a list of users
+        /// </summary>
+        /// <returns></returns>
         private List<UserModel> GenerateUsers()
         {
             return new List<UserModel>
