@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Configuration;
 using NetCoreRedis.Api.Models;
+using StackExchange.Redis;
 
 namespace NetCoreRedis.Api.Controllers
 {
@@ -15,6 +14,12 @@ namespace NetCoreRedis.Api.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
+        ConnectionMultiplexer _redisConnection;
+
+        public UsersController(IConfiguration config)
+        {
+            _redisConnection = ConnectionMultiplexer.Connect(config.GetConnectionString("RedisConnection"));
+        }
         /// <summary>
         /// Gets a list of users stored in cache or create a new one
         /// </summary>
@@ -36,6 +41,30 @@ namespace NetCoreRedis.Api.Controllers
             }
 
             return Ok(cacheValue);
+        }
+
+        [HttpGet]
+        [Route("GetAdminUsers/{id}")]
+        public async Task<ActionResult> GetAdminUsers([FromRoute] int id)
+        {
+            var dbRedis = _redisConnection.GetDatabase();
+
+            var usersList = await dbRedis.StringGetAsync("ADMIN-" + id.ToString());
+            return Ok(usersList.ToString());
+        }
+
+        [HttpPost]
+        public async Task<ActionResult> Post(
+            [FromServices] IConfiguration config,
+            IEnumerable<UserModel> users)
+        {
+            var dbRedis = _redisConnection.GetDatabase();
+            foreach (var user in users)
+            {
+                await dbRedis.StringSetAsync("ADMIN-" + user.Id.ToString(), JsonSerializer.Serialize(user), expiry: null);
+            }
+
+            return CreatedAtAction("GetAdminUsers", null);
         }
 
         /// <summary>
